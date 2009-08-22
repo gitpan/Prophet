@@ -1,0 +1,42 @@
+---
+abstract: ~
+author:
+  - 'clkao and jesse'
+build_requires:
+  ExtUtils::MakeMaker: 6.42
+  Test::Exception: 0.26
+configure_requires:
+  ExtUtils::MakeMaker: 6.42
+distribution_type: module
+generated_by: 'Module::Install version 0.91'
+license: Perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Prophet
+no_index:
+  directory:
+    - inc
+    - share
+    - t
+    - xt
+requires:
+  Any::Moose: 0.04
+  Config::GitLike: 1.02
+  Digest::SHA: 0
+  Exporter::Lite: 0
+  HTTP::Date: 0
+  IPC::Run3: 0
+  JSON: 2.00
+  LWP::UserAgent: 0
+  MIME::Base64::URLSafe: 0
+  Module::Pluggable: 0
+  Mouse: 0.21
+  Params::Validate: 0
+  Path::Dispatcher: 0.09
+  Proc::InvokeEditor: 0
+  Time::Progress: 0
+  URI: 0
+  UUID::Tiny: 0
+  XML::Atom::SimpleFeed: 0
+version: 0.69_01
