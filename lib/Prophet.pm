@@ -3,7 +3,7 @@ use strict;
 
 package Prophet;
 
-our $VERSION = '0.69_01';
+our $VERSION = '0.70';
 
 =head1 NAME
 
@@ -11,8 +11,9 @@ Prophet
 
 =head1 DESCRIPTION
 
-Prophet is a distributed database system designed for small to medium scale database applications (currently up to around 50,000 records of a given type).
-Our early targets include things such as bug tracking.
+Prophet is a distributed database system designed for small to medium
+scale social database applications.  Our early targets include things
+such as bug tracking.
 
 =head2 Design goals
 
@@ -30,7 +31,10 @@ Our early targets include things such as bug tracking.
 
 =head3 Scaling
 
-We don't currently intend for the first implementation of Prophet to scale to databases with millions of rows or hundreds of concurrent users. There's nothing that makes the design infeasible, but the infrastructure necessary for such a system will...needlessly hamstring it.
+We don't currently intend for the first implementation of Prophet to
+scale to databases with millions of rows or hundreds of concurrent
+users. There's nothing that makes the design infeasible, but the
+infrastructure necessary for such a system will...needlessly hamstring it.
 
 =cut
 
