@@ -7,7 +7,7 @@ sub usage_msg {
     my $cmd = $self->cli->get_script_name;
 
     return <<"END_USAGE";
-usage: ${cmd}clone --from <url>
+usage: ${cmd}clone --from <url> | --local
 END_USAGE
 }
 
@@ -16,42 +16,48 @@ sub run {
 
     $self->print_usage if $self->has_arg('h');
 
+    if ($self->has_arg('local')) {
+        $self->list_bonjour_sources;
+        return;
+    }
+
     $self->validate_args();
 
     $self->set_arg( 'to' => $self->app_handle->handle->url() );
 
-    my $source = Prophet::Replica->get_handle(
-        url        => $self->arg('from'),
+    $self->source( Prophet::Replica->get_handle(
+        url       => $self->arg('from'),
         app_handle => $self->app_handle,
-    );
-    my $target = Prophet::Replica->get_handle(
-        url        => $self->arg('to'),
-        app_handle => $self->app_handle,
-    );
+    ));
 
-    if ( $target->replica_exists ) {
+    $self->target( Prophet::Replica->get_handle(
+        url       => $self->arg('to'),
+        app_handle => $self->app_handle,
+    ));
+
+    if ( $self->target->replica_exists ) {
         die "The target replica already exists.\n";
     }
 
-    if ( !$target->can_initialize ) {
+    if ( !$self->target->can_initialize ) {
         die "The target replica path you specified can't be created.\n";
     }
 
     my %init_args;
-    if ( $source->isa('Prophet::ForeignReplica') ) {
-        $target->after_initialize( sub { shift->app_handle->set_db_defaults } );
+    if ( $self->source->isa('Prophet::ForeignReplica') ) {
+        $self->target->after_initialize( sub { shift->app_handle->set_db_defaults } );
     } else {
         %init_args = (
-            db_uuid    => $source->db_uuid,
-            resdb_uuid => $source->resolution_db_handle->db_uuid,
+            db_uuid    => $self->source->db_uuid,
+            resdb_uuid => $self->source->resolution_db_handle->db_uuid,
         );
     }
 
-    unless ($source->replica_exists) {
-        die "The source replica '@{[$source->url]}' doesn't exist or is unreadable.\n";
+    unless ($self->source->replica_exists) {
+        die "The source replica '@{[$self->source->url]}' doesn't exist or is unreadable.\n";
     }
 
-    $target->initialize(%init_args);
+    $self->target->initialize(%init_args);
 
     # create new config section for this replica
     my $from = $self->arg('from');
@@ -62,13 +68,13 @@ sub run {
             value => $self->arg('from'),
         },
         {   key => 'replica.'.$from.'.uuid',
-            value => $target->uuid,
+            value => $self->target->uuid,
         },
         ]
     );
 
-    if ( $source->can('database_settings') ) {
-        my $remote_db_settings = $source->database_settings;
+    if ( $self->source->can('database_settings') ) {
+        my $remote_db_settings = $self->source->database_settings;
         my $default_settings   = $self->app_handle->database_settings;
         for my $name ( keys %$remote_db_settings ) {
             my $uuid = $default_settings->{$name}[0];
@@ -95,6 +101,45 @@ sub validate_args {
 #
 sub merge_resolver { 'Prophet::Resolver::AlwaysTarget'}
 
+
+=head2 list_bonjour_sources
+
+Probes the local network for bonjour replicas if the local arg is specified.
+
+Prints a list of all sources found.
+
+=cut
+sub list_bonjour_sources {
+    my $self = shift;
+    my @bonjour_sources;
+
+    Prophet::App->try_to_require('Net::Bonjour');
+    if ( Prophet::App->already_required('Net::Bonjour') ) {
+        print "Probing for local sources with Bonjour\n\n";
+        my $res = Net::Bonjour->new('prophet');
+        $res->discover;
+        my $count = 0;
+        for my $entry ( $res->entries ) {
+                require URI;
+                my $uri = URI->new();
+                $uri->scheme( 'http' );
+                $uri->host($entry->hostname);
+                $uri->port( $entry->port );
+                $uri->path('replica/');
+                print '  * '.$uri->canonical.' - '.$entry->name."\n";
+                $count++;
+        }
+
+        if ($count) {
+            print "\nFound $count source".($count==1? '' : 's')."\n";
+        }
+        else {
+            print "No local sources found.\n";
+        }
+    }
+
+    return;
+}
 
 
 __PACKAGE__->meta->make_immutable;

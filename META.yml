@@ -41,4 +41,4 @@ requires:
   XML::Atom::SimpleFeed: 0
 resources:
   license: http://opensource.org/licenses/mit-license.php
-version: 0.70
+version: 0.71
