@@ -100,7 +100,9 @@ sub run_one_command {
             # we don't want to recursively call if people stupidly write
             # alias pull --local = pull --local
             next if ( $command eq $ori_cmd );
-            return $self->run_one_command( split /\s+/, $command );
+            require Text::ParseWords;
+            return $self->run_one_command(
+                Text::ParseWords::shellwords($command) );
         }
     }
     #  really, we shouldn't be doing this stuff from the command dispatcher
@@ -126,13 +128,14 @@ sub _command_matches_alias {
     my $cmd   = shift;
     my $alias = shift;
     my $dispatch_to = shift;;
-    if ( $cmd =~ /^\Q$alias\E\s*(.*)$/ ) {
-        no strict 'refs';
-
+    if ( $cmd =~ /^\Q$alias\E\b\s*(.*)$/ ) {
         my $rest = $1;
-        # we want to start at index 1
-        my @captures = (undef, $self->tokenize($rest));
-        $dispatch_to =~ s/\$$_\b/$captures[$_]/g for 1 .. 20;
+        if ($dispatch_to =~ m{\$\d+\b}) {
+            my @captures = $self->tokenize($rest);
+            $dispatch_to =~ s/\$(\d+)\b/$captures[$1 - 1]||""/ge;
+        } else {
+            $dispatch_to .= " " . $rest;
+        }
         return $dispatch_to;
     }
     return undef;

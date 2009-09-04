@@ -485,10 +485,11 @@ sub has_seen_changeset {
         $self->display_name_for_replica($args{source_uuid}));
 
     # If the changeset originated locally, we never want it
-    if ($args{source_uuid} eq $self->uuid ) {
+    if (lc($args{source_uuid}) eq lc($self->uuid) ) {
         $self->log_debug("\t  - We have. (It originated locally.)");
         return 1 
     }
+
     # Otherwise, if the we have a merge ticket from the source, we don't want
     # the changeset if the source's sequence # is >= the changeset's sequence
     # #, we can safely skip it
@@ -1044,7 +1045,7 @@ previous version of a record might look like:
         root => $self->repo_handle->fs->revision_root( $self->repo_handle->fs->youngest_rev - 1 )
     );
 
-=head3 record_exists {uuid => $UUID, type => $TYPE, root => $ROOT }
+=head3 record_exists {uuid => $UUID, type => $TYPE }
 
 Returns true if the record in question exists and false otherwise.
 

@@ -37,8 +37,8 @@ requires:
   Proc::InvokeEditor: 0
   Time::Progress: 0
   URI: 0
-  UUID::Tiny: 0
+  UUID::Tiny: 1.02
   XML::Atom::SimpleFeed: 0
 resources:
   license: http://opensource.org/licenses/mit-license.php
-version: 0.71
+version: 0.72

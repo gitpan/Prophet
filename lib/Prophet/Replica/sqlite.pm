@@ -155,6 +155,7 @@ sub _check_for_upgrades {
     my $self = shift;
    if  ( $self->replica_version && $self->replica_version < 2) { $self->_upgrade_replica_to_v2(); } 
    if  ( $self->replica_version && $self->replica_version < 3) { $self->_upgrade_replica_to_v3(); } 
+   if  ( $self->replica_version && $self->replica_version < 5) { $self->_upgrade_replica_to_v5(); }
 
 }
 
@@ -166,6 +167,7 @@ sub __fetch_data {
     my $table = shift;
     my $key = shift;
 
+	$key = lc($key);
     my $sth = $self->dbh->prepare("SELECT value FROM $table WHERE key = ?");
     $sth->execute($key);
        
@@ -175,10 +177,11 @@ sub __fetch_data {
 
 sub __store_data {
     my $self = shift;
-    my %args = ( key => undef, value => undef, table => undef, @_);
-    $self->dbh->do("DELETE FROM $args{table} WHERE key = ?", {},$args{key});
-    $self->dbh->do("INSERT INTO $args{table} (key,value) VALUES(?,?)", {}, $args{key}, $args{value});
-    
+    my %args = validate(@_, { key => 1, value => 1, table => 1});
+	$args{key} = lc($args{key});
+    $self->dbh->do( "DELETE FROM $args{table} WHERE key = ?", {}, $args{key} );
+    $self->dbh->do( "INSERT INTO $args{table} (key,value) VALUES(?,?)", {}, $args{key}, $args{value} );
+
 }
 
 sub fetch_local_metadata {
@@ -644,7 +647,10 @@ sub _write_changeset_to_db {
 
     my $local_id = $self->dbh->last_insert_id(undef, undef, 'changesets', 'sequence_no');
 
-    $self->dbh->do("UPDATE changesets set original_sequence_no = sequence_no WHERE sequence_no = ?", {}, $local_id) unless ($changeset->original_sequence_no);
+    $self->dbh->do(
+        "UPDATE changesets set original_sequence_no = sequence_no
+            WHERE sequence_no = ?", {}, $local_id
+    ) unless defined $changeset->original_sequence_no;
 
     for my $change (@{$changeset->changes}) {
         $self->_write_change_to_db($change, $local_id);
@@ -975,8 +981,20 @@ sub _upgrade_replica_to_v3 {
         ],
         version => 3
     );
-
 }
+
+
+sub _upgrade_replica_to_v5 {
+    my $self = shift;
+
+    $self->_do_db_upgrades(
+        statements => [
+            q{UPDATE local_metadata SET key = lower(key)}
+        ],
+        version => 5
+    );
+}
+
 
 
 sub _do_db_upgrades {
