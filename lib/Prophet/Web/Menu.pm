@@ -5,13 +5,19 @@ use URI;
 
 has cgi => (isa =>'CGI', is=>'ro');
 has label => ( isa => 'Str', is => 'rw');
-has parent => ( isa => 'Prophet::Web::Menu|Undef', is => 'rw', weakref => 1);
+has parent => ( isa => 'Prophet::Web::Menu|Undef', is => 'rw', weak_ref => 1);
 has sort_order => ( isa => 'Str', is => 'rw');
 has render_children_inline => ( isa => 'Bool', is => 'rw', default => 0);
-has url => ( isa => 'Str', is => 'rw');
+has url => ( isa => 'Str', is => 'bare');
 has target => ( isa => 'Str', is => 'rw');
 has class => ( isa => 'Str', is => 'rw');
 has escape_label => ( isa => 'Bool', is => 'rw');
+has server => (isa => 'Prophet::Server', 
+			   is => 'ro', 
+			   weak_ref => 1,
+			   
+			   );
+
 
 =head1 NAME
 
@@ -98,8 +104,10 @@ sub url {
 
     $self->{url} =~ s!///!/! if $self->{url};
 
-    return $self->{url};
+    return $self->server->make_link_relative($self->{url});
 }
+
+
 
 =head2 active [BOOLEAN]
 
@@ -141,6 +149,7 @@ sub child {
                                                           || scalar values %{$self->{children}}),
                                                label => $key,
                                                escape_label => 1,
+											   server => $self->server,
                                                @_
                                              });
         

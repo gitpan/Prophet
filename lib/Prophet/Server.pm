@@ -15,6 +15,12 @@ use Cwd ();
 use JSON;
 use HTTP::Date;
 
+# Only define a class type constraint for CGI if it's not already defined,
+# because Moose doesn't auto-define class type constraints while Mouse does.
+unless (find_type_constraint('CGI')) {
+    use Any::Moose '::Util::TypeConstraints';
+    class_type('CGI');
+}
 
 
 has app_handle => (
@@ -42,7 +48,7 @@ sub run {
 
     if ($publisher) {
         $publisher->publish(
-            name   => $self->handle->db_uuid,
+            name   => $self->database_bonjour_name,
             type   => '_prophet._tcp',
             port   => $self->port,
             domain => 'local',
@@ -54,6 +60,17 @@ sub run {
     $self->setup_template_roots();
     print ref($self) . ": Starting up local server. You can stop the server with Ctrl-c.\n";
     $self->SUPER::run(@_);
+}
+
+=head2 database_bonjour_name
+
+Returns the name this database should use to announce itself via bonjour
+
+=cut
+
+sub database_bonjour_name {
+	my $self = shift;
+	return $self->handle->db_uuid;
 }
 
 sub setup_template_roots {
@@ -148,7 +165,7 @@ sub handle_request {
     my ( $self, $cgi ) = validate_pos( @_, { isa => 'Prophet::Server' }, { isa => 'CGI' } );
     $self->cgi($cgi);
     $self->log_request();
-    $self->nav( Prophet::Web::Menu->new( cgi => $self->cgi ) );
+    $self->nav( Prophet::Web::Menu->new( cgi => $self->cgi, server => $self) );
     $self->result( Prophet::Web::Result->new() );
     if ( $ENV{'PROPHET_DEVEL'} ) {
         require Module::Refresh;
@@ -406,6 +423,19 @@ sub _send_redirect {
     print "HTTP/1.0 302 Go over there\r\n";
     print "Location: " . $args{'to'} . "\r\n";
     return '302';
+}
+
+=head2 make_link_relative PATH
+
+This method does its best to convert a URI path from absolute ( starts
+at / ) to relative. (Starts at .).
+
+=cut
+
+sub make_link_relative {
+	my $self = shift;
+    my $link = shift;
+    return URI::file->new($link)->rel("file://".$self->cgi->path_info());
 }
 
 1;

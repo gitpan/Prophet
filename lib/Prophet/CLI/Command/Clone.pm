@@ -7,7 +7,7 @@ sub usage_msg {
     my $cmd = $self->cli->get_script_name;
 
     return <<"END_USAGE";
-usage: ${cmd}clone --from <url> | --local
+usage: ${cmd}clone --from <url> [--as <alias>]| --local
 END_USAGE
 }
 
@@ -25,11 +25,6 @@ sub run {
 
     $self->set_arg( 'to' => $self->app_handle->handle->url() );
 
-    $self->source( Prophet::Replica->get_handle(
-        url       => $self->arg('from'),
-        app_handle => $self->app_handle,
-    ));
-
     $self->target( Prophet::Replica->get_handle(
         url       => $self->arg('to'),
         app_handle => $self->app_handle,
@@ -42,6 +37,11 @@ sub run {
     if ( !$self->target->can_initialize ) {
         die "The target replica path you specified can't be created.\n";
     }
+
+    $self->source( Prophet::Replica->get_handle(
+        url       => $self->arg('from'),
+        app_handle => $self->app_handle,
+    ));
 
     my %init_args;
     if ( $self->source->isa('Prophet::ForeignReplica') ) {
@@ -61,13 +61,16 @@ sub run {
 
     # create new config section for this replica
     my $from = $self->arg('from');
+    my $alias = $self->arg('as');
+    my $base_key = $alias ? 'replica.'.$alias : 'replica.'.$from;
+
     $self->app_handle->config->group_set(
         $self->app_handle->config->replica_config_file,
         [ {
-            key => 'replica.'.$from.'.url',
+            key => $base_key.'.url',
             value => $self->arg('from'),
         },
-        {   key => 'replica.'.$from.'.uuid',
+        {   key => $base_key.'.uuid',
             value => $self->target->uuid,
         },
         ]
@@ -109,6 +112,7 @@ Probes the local network for bonjour replicas if the local arg is specified.
 Prints a list of all sources found.
 
 =cut
+
 sub list_bonjour_sources {
     my $self = shift;
     my @bonjour_sources;

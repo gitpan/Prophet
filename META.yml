@@ -33,7 +33,7 @@ requires:
   Module::Pluggable: 0
   Mouse: 0.21
   Params::Validate: 0
-  Path::Dispatcher: 0.09
+  Path::Dispatcher: 0.14
   Proc::InvokeEditor: 0
   Time::Progress: 0
   URI: 0
@@ -41,4 +41,4 @@ requires:
   XML::Atom::SimpleFeed: 0
 resources:
   license: http://opensource.org/licenses/mit-license.php
-version: 0.73
+version: 0.74

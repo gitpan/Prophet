@@ -5,6 +5,7 @@ extends 'Prophet::CLI::Command';
 use File::Spec;
 use Prophet::Util;
 use Text::ParseWords qw(shellwords);
+use Scalar::Util qw(weaken);
 
 has name => (
     is => 'ro',
@@ -18,14 +19,22 @@ has term => (
     lazy    => 1,
     handles => [qw/readline addhistory/],
     default => sub {
+        my $self = shift;
+        my $weakself = $self;
+        weaken($weakself);
+
         require Term::ReadLine;
-        return Term::ReadLine->new("Prophet shell");
+        my $term = Term::ReadLine->new("Prophet shell");
+        $term->Attribs->{completion_function} = sub {
+            $weakself->_complete(@_);
+        };
+        return $term;
     },
 );
 
-    our $HIST = $ENV{PROPHET_HISTFILE}
-            || (($ENV{HOME} || (getpwuid($<))[7]) . "/.prophetreplhist");
-    our $LEN = $ENV{PROPHET_HISTLEN} || 500;
+our $HIST = $ENV{PROPHET_HISTFILE}
+        || (($ENV{HOME} || (getpwuid($<))[7]) . "/.prophetreplhist");
+our $LEN = $ENV{PROPHET_HISTLEN} || 500;
 
 
 sub usage_msg {
@@ -84,6 +93,22 @@ sub _run {
 
         $self->eval($cmd);
     }
+}
+
+sub _complete {
+    my ($self, $last_word, $line, $start) = @_;
+
+    # we can't just use $last_word because we want all the text before the cursor to
+    # matter, not just the current word
+
+    my $dispatcher = $self->cli->dispatcher_class->new(cli => $self->cli);
+
+    # We're supposed to return only the completion of $last_word, not replacements
+    # of $line. So for a completion that returns multiple words, this could screw
+    # up and return only its last word.
+    my @matches = map { s/^.* //; $_ } $dispatcher->complete($line);
+
+    return @matches;
 }
 
 # make the REPL history persistent

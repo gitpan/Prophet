@@ -23,7 +23,8 @@ has app_handle => (
 has handle => (
     is       => 'rw',
     required => 1,
-    default => sub { shift->app_handle->handle }
+    lazy     => 1,
+    default  => sub { shift->app_handle->handle }
 );
 
 has type => (
@@ -56,7 +57,7 @@ sub PROPERTIES { $PROPERTIES }
 
 =head2 new  { handle => Prophet::Replica, type => $type }
 
-Instantiates a new, empty L<Prophet::Record/> of type $type.
+Instantiates a new, empty L<Prophet::Record> of type $type.
 
 =head2 declared_props
 
