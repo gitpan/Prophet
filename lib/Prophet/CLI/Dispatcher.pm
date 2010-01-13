@@ -113,6 +113,13 @@ on qr/^(alias(?:es)?|config)?\s+(.*)/ => sub {
     die "Could not find '$class' command class";
 };
 
+on qr/^_gencomp\s*(.*)/ => sub {
+    my $self = shift;
+    my $path = $1;
+    $path = "" if !defined($path);
+    print "$_\n" for $self->dispatcher->complete($path);
+};
+
 sub run_command {
     my $name = shift;
     return sub {
