@@ -20,7 +20,8 @@ requires('Proc::InvokeEditor');
 requires( 'Any::Moose'    => '0.04' );
 requires( 'Mouse'         => '0.21' );
 requires('XML::Atom::SimpleFeed');
-requires( 'Path::Dispatcher' => '0.14' );    # Path::Dispatcher::Declarative
+requires( 'Path::Dispatcher' => '0.14' );
+requires( 'Path::Dispatcher::Declarative' );
 requires('Time::Progress');
 requires('Config::GitLike' => '1.02');
 requires('MIME::Base64::URLSafe');
@@ -48,7 +49,7 @@ feature 'SQLite replica support' => -default => 1,
     'DBI'                        => 1,
     'DBD::SQLite'                => 1;
 
-feature 'Maintainer testing tools' => -default => 1,
+feature 'Maintainer testing tools' => -default => 0,
     'Test::HTTP::Server::Simple',
     'YAML::Syck'           => 0,
     'Module::Refresh'      => 0,
