@@ -1,6 +1,8 @@
 package Prophet::Server;
 use Any::Moose;
-extends qw'HTTP::Server::Simple::CGI';
+
+# this instead of extends silences "You inherit from non-Mouse class" warning
+use base 'HTTP::Server::Simple::CGI';
 
 use Prophet::Server::Controller;
 use Prophet::Server::View;
@@ -30,11 +32,17 @@ has app_handle => (
 );
 
 has cgi        => ( isa => 'CGI|Undef',                is  => 'rw' );
-has nav        => ( isa => 'Prophet::Web::Menu|Undef', is  => 'rw' );
+has page_nav   => ( isa => 'Prophet::Web::Menu|Undef', is  => 'rw' );
 has read_only  => ( isa  => 'Bool',                        is => 'rw' );
 has static     => ( isa =>  'Bool',                        is => 'rw');
 has view_class => ( isa => 'Str',                       is  => 'rw' );
 has result     => ( isa => 'Prophet::Web::Result',      is  => 'rw' );
+has port       => ( isa => 'Str', is => 'rw',
+                    default => sub {
+                        my $self = shift;
+                        return $self->app_handle->config->get(
+                                key => 'server.default-port' ) || '8008';
+                    } );
 
 sub run {
     my $self      = shift;
@@ -43,8 +51,8 @@ sub run {
         Net::Rendezvous::Publish->new;
     };
 
-    eval { require Template::Declare }  || return "Without Template::Declare installed, Prophet's Web UI won't work";
-    eval { require File::ShareDir }  || return "Without File::ShareDir installed, Prophet's Web UI won't work";
+    eval { require Template::Declare }  || die "Without Template::Declare installed, Prophet's Web UI won't work";
+    eval { require File::ShareDir }  || die "Without File::ShareDir installed, Prophet's Web UI won't work";
 
     if ($publisher) {
         $publisher->publish(
@@ -59,8 +67,17 @@ sub run {
     }
     $self->setup_template_roots();
     print ref($self) . ": Starting up local server. You can stop the server with Ctrl-c.\n";
-    $self->SUPER::run(@_);
-}
+    eval {
+        $self->SUPER::run(@_);
+    };
+    if ($@) {
+        if ( $@ =~ m/^bind to \*:(\d+): Address already in use/ ) {
+            die "\nPort $1 is already in use! Start the server on a different port using --port.\n";
+        } else {
+            die "\nError while starting server:\n\n$@\n";
+        }
+    }
+  }
 
 =head2 database_bonjour_name
 
@@ -92,14 +109,16 @@ sub prophet_static_root {
     my $self = shift;
     unless ($PROPHET_STATIC_ROOT) {
 
-        $PROPHET_STATIC_ROOT = File::Spec->catdir( Prophet::Util->updir( $INC{'Prophet.pm'} ),
-            "..", "share", "web", "static" );
+        $PROPHET_STATIC_ROOT = File::Spec->catdir(
+            Prophet::Util->updir( $INC{'Prophet.pm'}, 2 ), "share",
+            "web", "static"
+        );
 
         eval { require File::ShareDir; 1 }
             or die "requires File::ShareDir to determine default static root";
 
         $PROPHET_STATIC_ROOT
-            = File::Spec->catfile( File::ShareDir::dist_dir('Prophet'), 'web/static' )
+            = Prophet::Util->catfile( File::ShareDir::dist_dir('Prophet'), 'web/static' )
             if ( !-d $PROPHET_STATIC_ROOT );
 
         $PROPHET_STATIC_ROOT = Cwd::abs_path($PROPHET_STATIC_ROOT);
@@ -120,8 +139,10 @@ sub app_static_root {
         my $app_file = ref($self->app_handle) .".pm";
         $app_file =~ s|::|/|g;
 
-         $APP_STATIC_ROOT = File::Spec->catdir( Prophet::Util->updir( $INC{$app_file} ),
-          "..",  "..", "share", "web", "static" );
+        $APP_STATIC_ROOT = File::Spec->catdir(
+            Prophet::Util->updir( $INC{$app_file}, 3 ), "share",
+            "web", "static"
+        );
 
         my $dist = ref($self->app_handle);
         $dist =~ s/::/-/g;
@@ -130,13 +151,29 @@ sub app_static_root {
             or die "requires File::ShareDir to determine default static root";
 
         $APP_STATIC_ROOT
-            = File::Spec->catfile( File::ShareDir::dist_dir($dist), 'web/static' )
+            = Prophet::Util->catfile( File::ShareDir::dist_dir($dist), 'web', 'static' )
             if ( !-d $APP_STATIC_ROOT );
 
         $APP_STATIC_ROOT = Cwd::abs_path($APP_STATIC_ROOT);
 
     }
     return $APP_STATIC_ROOT;
+}
+
+# Use system-installed CSS and Javascript libraries if they exist, so distros
+# have the option to not ship our embedded copies.
+#
+# I'm not sure if RPM-based systems have a standard location for system
+# Javascript libraries, but this ought to work on Debian/Ubuntu. Patches
+# welcome.
+sub system_js_and_css {
+    my $mapping = {
+        'yui/css/reset.css'
+                => '/usr/share/javascript/yui/reset/reset.css',
+        'jquery/js/jquery-1.2.6.min.js',
+                => '/usr/share/javascript/jquery/jquery.min.js',
+    };
+    return $mapping;
 }
 
 sub css {
@@ -165,7 +202,8 @@ sub handle_request {
     my ( $self, $cgi ) = validate_pos( @_, { isa => 'Prophet::Server' }, { isa => 'CGI' } );
     $self->cgi($cgi);
     $self->log_request();
-    $self->nav( Prophet::Web::Menu->new( cgi => $self->cgi, server => $self) );
+    $self->page_nav(
+        Prophet::Web::Menu->new( cgi => $self->cgi, server => $self) );
     $self->result( Prophet::Web::Result->new() );
     if ( $ENV{'PROPHET_DEVEL'} ) {
         require Module::Refresh;
@@ -331,7 +369,7 @@ sub render_template {
     if ( Template::Declare->has_template($p) ) {
         $self->view_class->app_handle( $self->app_handle );
         $self->view_class->cgi( $self->cgi );
-        $self->view_class->nav( $self->nav);
+        $self->view_class->page_nav( $self->page_nav );
         $self->view_class->server($self);
         my $content = Template::Declare->show($p,@_);
         return $content;
@@ -371,16 +409,28 @@ sub send_static_file {
     } elsif ( $filename =~ /.png$/ ) {
         $type = 'image/png';
     }
-    for my $root ( $self->app_static_root, $self->prophet_static_root) {
-        next unless -f File::Spec->catfile( $root => $filename );
-        my $qualified_file = Cwd::fast_abs_path( File::Spec->catfile( $root => $filename ) );
-        next if substr( $qualified_file, 0, length($root) ) ne $root;
-        my $content = Prophet::Util->slurp($qualified_file);
-        return $self->send_content( static => 1, content => $content, content_type => $type );
+
+    my $system_library_mapping = $self->system_js_and_css();
+    my $content;
+    if ( $system_library_mapping->{ $filename } &&
+         -f $system_library_mapping->{ $filename } ) {
+        $content = Prophet::Util->slurp( $system_library_mapping->{ $filename } );
+    }
+    else {
+        for my $root ( $self->app_static_root, $self->prophet_static_root) {
+            next unless -f Prophet::Util->catfile( $root => $filename );
+            my $qualified_file = Cwd::fast_abs_path( File::Spec->catfile( $root => $filename ) );
+            next if substr( $qualified_file, 0, length($root) ) ne $root;
+            $content = Prophet::Util->slurp($qualified_file);
+        }
     }
 
-    return $self->_send_404;
-
+    if ( defined $content ) {
+        return $self->send_content( static => 1, content => $content, content_type => $type );
+    }
+    else {
+        return $self->_send_404;
+    }
 }
 
 sub send_content {
@@ -437,5 +487,8 @@ sub make_link_relative {
     my $link = shift;
     return URI::file->new($link)->rel("file://".$self->cgi->path_info());
 }
+
+__PACKAGE__->meta->make_immutable;
+no Any::Moose;
 
 1;

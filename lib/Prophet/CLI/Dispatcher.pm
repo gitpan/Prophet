@@ -3,9 +3,11 @@ use Path::Dispatcher::Declarative -base;
 use Any::Moose;
 extends 'Path::Dispatcher::Declarative', any_moose('Object');
 
-require Prophet::CLIContext;
+use Prophet::CLI::Dispatcher::Rule::RecordId;
 
 with 'Prophet::CLI::Parameters';
+
+our $cli;
 
 our @PREFIXES = qw(Prophet::CLI::Command);
 sub add_command_prefix { unshift @PREFIXES, @_ }
@@ -57,12 +59,22 @@ under settings => sub {
     };
 };
 
-on [ qr/^(update|edit|show|display|delete|del|rm|history)$/,
-     qr/^$Prophet::CLIContext::ID_REGEX$/i ] => sub {
-    my $self = shift;
-    $self->context->set_id_from_primary_commands;
-    run($1, $self, @_);
-};
+dispatcher->add_rule(
+    Path::Dispatcher::Rule::Sequence->new(
+        rules => [
+            Path::Dispatcher::Rule::Regex->new(
+                regex => qr/^(update|edit|show|display|delete|del|rm|history)$/,
+            ),
+            Prophet::CLI::Dispatcher::Rule::RecordId->new,
+        ],
+        block => sub {
+            my $match = shift;
+            my $self = shift;
+            $self->context->set_id_from_primary_commands;
+            run($match->pos(1), $self, @_);
+        },
+    )
+);
 
 on [ [ 'update', 'edit' ] ]      => run_command("Update");
 on [ [ 'show', 'display' ] ]     => run_command("Show");

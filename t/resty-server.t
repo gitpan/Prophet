@@ -10,7 +10,8 @@ BEGIN {
 
 use Prophet::Test;
 BEGIN {
-    eval {require Test::WWW::Mechanize; } || plan skip_all => "This test  file requirs Test::WWW::Mechanize";
+    eval { require Test::WWW::Mechanize; require Test::HTTP::Server::Simple }
+        || plan skip_all => "This test file requires Test::WWW::Mechanize and Test::HTTP::Server::Simple";
 }
 
 
@@ -22,11 +23,10 @@ use_ok('Prophet::Record');
 
 my $ua  = Test::WWW::Mechanize->new();
 my $cli = Prophet::CLI->new();
-my $s   = Prophet::TestServer->new();
 
 $cli->handle()->initialize;
 
-$s->app_handle( $cli->app_handle );
+my $s = Prophet::TestServer->new( app_handle => $cli->app_handle );
 
 my $url_root = $s->started_ok("start up my web server");
 

@@ -30,6 +30,9 @@ sub run {
     my %previous_sources_by_name
         = $self->app_handle->config->sources( variable => 'publish-url' );
 
+    my %shell_by_name
+        = $self->app_handle->config->sources( variable => 'publish-shell' );
+
     my $to = exists $previous_sources_by_name{$self->arg('to')}
         ? $previous_sources_by_name{$self->arg('to')}
         : $self->arg('to');
@@ -62,6 +65,7 @@ sub run {
     $self->publish_dir(
         from => $from,
         to   => $to,
+        shell => $shell_by_name{$self->arg('to')},
     );
 
     print "Publication complete.\n";
@@ -97,11 +101,8 @@ sub render_templates_into {
      if (!$self->app_handle->try_to_require($server_class)) {
          $server_class = "Prophet::Server";
      }
-    my $server = $server_class->new();
-    $server->app_handle( $self->app_handle );
+    my $server = $server_class->new( app_handle => $self->app_handle );
     $server->setup_template_roots();
-
-
 
     # allow user to specify a specific type to render
     my @types = $self->type || $self->types_to_render;

@@ -77,7 +77,10 @@ has changeset_cas => (
     },
 );
 
-has current_edit => ( is => 'rw', );
+has current_edit => (
+    is  => 'rw',
+    isa => 'Maybe[Prophet::ChangeSet]',
+);
 
 has current_edit_records => (
     is        => 'rw',
@@ -208,7 +211,7 @@ TODO: define the format for changesets and records
 
 Files inside the C<records> directory are index files which list off all published versions of a record and the key necessary to retrieve the record from the I<content-addressed store>.
 
-Inside the C<records> directory, you'll     warn "Got types ".join(',',@types);find directories named for each
+Inside the C<records> directory, you'll find directories named for each
 C<type> in your database. Inside each C<type> directory, you'll find a two-level directory tree of single hexadecimal digits. You'll find the record with the type <Foo> and the UUID C<29A3CA16-03C5-11DD-9AE0-E25CFCEE7EC4> stored in 
 
  records/Foo/2/9/29A3CA16-03C5-11DD-9AE0-E25CFCEE7EC4
@@ -457,7 +460,7 @@ sub _write_record_index_entry {
         type => $args{type}
     );
 
-    my $index_path = File::Spec->catfile( $self->fs_root, $idx_filename );
+    my $index_path = Prophet::Util->catfile( $self->fs_root, $idx_filename );
     my ( undef, $parent, $filename ) = File::Spec->splitpath($index_path);
     mkpath( [$parent] );
 
@@ -524,7 +527,7 @@ sub _delete_record_index {
         uuid => $args{uuid},
         type => $args{type}
     );
-    unlink File::Spec->catfile( $self->fs_root => $idx_filename )
+    unlink Prophet::Util->catfile( $self->fs_root => $idx_filename )
         || die "Could not delete record $idx_filename: " . $!;
 }
 
@@ -550,7 +553,7 @@ memoize '_record_index_filename' unless $^O =~ /MSWin/;
 sub _record_index_filename {
     my $self = shift;
     my %args = validate( @_, { uuid => 1, type => 1 } );
-    return File::Spec->catfile( $self->_record_type_dir( $args{'type'} ), Prophet::Util::hashed_dir_name( $args{uuid} ));
+    return Prophet::Util->catfile( $self->_record_type_dir( $args{'type'} ), Prophet::Util::hashed_dir_name( $args{uuid} ));
 }
 
 sub _record_cas_filename {
@@ -614,7 +617,11 @@ sub changesets_for_record {
 }
 
 
+=head2 begin_edit
 
+Creates a new L<Prophet::ChangeSet>, which new changes will be added to.
+
+=cut
 
 sub begin_edit {
     my $self = shift;
@@ -638,7 +645,6 @@ sub begin_edit {
     );
     $self->current_edit($changeset);
     $self->current_edit_records( [] );
-
 }
 
 sub _set_original_source_metadata_for_current_edit {

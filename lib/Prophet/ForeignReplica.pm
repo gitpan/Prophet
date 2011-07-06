@@ -18,30 +18,31 @@ records and so on.
 
 =cut
 
-sub fetch_local_metadata { my $self = shift;
+sub fetch_local_metadata {
+    my $self = shift;
     my $key = shift;
-    $self->app_handle->handle->fetch_local_metadata( $self->uuid . "-".$key )
-    
-    }
-sub store_local_metadata { my $self = shift;
+    return $self->app_handle->handle->fetch_local_metadata(
+       $self->uuid . "-".$key );
+}
+
+sub store_local_metadata {
+    my $self = shift;
     my $key = shift;
     my $value = shift;
-   $self->app_handle->handle->store_local_metadata( $self->uuid."-".$key => $value);
-    
-    
-    }
-
-
-
+    return $self->app_handle->handle->store_local_metadata(
+       $self->uuid."-".$key => $value);
+}
 
 sub conflicts_from_changeset { return; }
 sub can_write_changesets     {1}
 
-sub record_resolutions { die "Resolution handling is not for foreign replicas" }
+sub record_resolutions {
+   die "Resolution handling is not for foreign replicas";
+}
 
 sub import_resolutions_from_remote_source {
     warn 'resdb not implemented yet';
-    return
+    return;
 }
 
 =head2 record_changes L<Prophet::ChangeSet>
@@ -49,7 +50,6 @@ sub import_resolutions_from_remote_source {
 Integrate all changes in this changeset.
 
 =cut
-
 
 sub record_changes {
     my $self = shift;
@@ -79,12 +79,15 @@ Named parameters:
 
     uri
     username
+    password
     username_prompt
     secret_prompt
 
 To use the default prompts, which ask for a username and password, pass in
-C<uri> and (optionally) C<username>.  The username prompt will be skipped
-if a username is passed in.
+C<uri> and (optionally) C<username>.  Either prompt will be skipped if
+a value is passed in to begin, making this suitable for use in a login
+loop that prompts for values and then tests that they work for authentication,
+looping around if they don't.
 
 You can also override the default prompts by passing in subroutines for
 C<username_prompt> and/or C<secret_prompt>. These subroutines return strings
@@ -104,6 +107,7 @@ sub prompt_for_login {
     my %args = (
         uri             => undef,
         username        => undef,
+        password        => undef,
         secret_prompt   => sub {
             my ($uri, $username) = @_;
             return "Password for $username: @ $uri: ";
@@ -115,17 +119,17 @@ sub prompt_for_login {
         @_,
     );
 
-    # check if username is in config
-    my $replica_username     = 'replica.' . $self->{url} . '.username';
-    my $replica_secret_token = 'replica.' . $self->{url} . '.secret_token';
+    # check if username and password are in config
+    my $replica_username_key = 'replica.' . $self->scheme
+                                          .":" . $self->{url} . '.username';
+    my $replica_token_key    = 'replica.' . $self->scheme . ":"
+                                          . $self->{url} . '.secret_token';
 
     if ( !$args{username} ) {
         my $check_username
-            = $self->app_handle->config->get( key => $replica_username );
+            = $self->app_handle->config->get( key => $replica_username_key );
         $args{username} = $check_username if $check_username;
     }
-    
-    my $secret;
 
     my $was_in_pager = Prophet::CLI->in_pager();
     Prophet::CLI->end_pager();
@@ -140,38 +144,20 @@ sub prompt_for_login {
     }
 
     if ( my $check_password
-        = $self->app_handle->config->get( key => $replica_secret_token ) )
+        = $self->app_handle->config->get( key => $replica_token_key ) )
     {
-        $secret = $check_password;
+        $args{password} = $check_password;
     }
-    else {
+    elsif ( !defined($args{password}) ) {
         print $args{secret_prompt}( $args{uri}, $args{username} );
         ReadMode 2;
-        chomp( $secret = ReadLine 0 );
+        chomp( $args{password} = ReadLine 0 );
         ReadMode 1;
         print "\n";
     }
     Prophet::CLI->start_pager() if ($was_in_pager);
 
-    # store username and secret token in config file
-    if ( !$self->app_handle->config->get( key => $replica_username ) ) {
-        print "Setting replica's username in the config file";
-        $self->app_handle->config->set(
-            key      => $replica_username,
-            value    => $args{username},
-            filename => $self->app_handle->config->origins->{
-                'core.config-format-version'},
-        );
-        print "Setting replica's secret_token in the config file";
-        $self->app_handle->config->set(
-            key      => $replica_secret_token,
-            value    => $secret,
-            filename => $self->app_handle->config->origins->{
-                'core.config-format-version'},
-        );
-    }
-
-    return ( $args{username}, $secret );
+    return ( $args{username}, $args{password} );
 }
 
 sub log {
@@ -180,7 +166,6 @@ sub log {
     Carp::confess unless ($self->app_handle);
     $self->app_handle->log($self->url.": " .$msg);
 }
-
 
 no Any::Moose;
 __PACKAGE__->meta->make_immutable;

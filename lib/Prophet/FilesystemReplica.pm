@@ -47,7 +47,7 @@ sub read_file {
 
         # make sure we don't try to read files outside the replica
         my $qualified_file = Cwd::fast_abs_path(
-            File::Spec->catfile( $self->fs_root => $file ) );
+            Prophet::Util->catfile( $self->fs_root => $file ) );
         return undef
             if substr( $qualified_file, 0, length( $self->fs_root ) ) ne
                 $self->fs_root;
@@ -57,13 +57,15 @@ sub read_file {
 
 sub _read_file {
     my $self = shift;
-    my ($file) = validate_pos( @_, 1 );
+    my ($file) = (@_); # validation is too heavy to be called here
+    #my ($file) = validate_pos( @_, 1 );
 	$self->backend->read_file($file);
 }
 
 sub _write_file {
     my $self = shift;
-    my %args = validate( @_, { path => 1, content => 1 } );
+    my %args = (@_); # validate is too heavy to be called here
+    #    my %args = validate( @_, { path => 1, content => 1 } );
 
 	$self->backend->write_file(%args);
 }
@@ -265,7 +267,7 @@ sub read_userdata {
     my $self = shift;
     my %args = validate( @_, { path => 1 } );
 
-    $self->_read_file( File::Spec->catfile( $self->userdata_dir, $args{path} ) );
+    $self->_read_file( Prophet::Util->catfile( $self->userdata_dir, $args{path} ) );
 }
 
 =head2 write_userdata
@@ -279,7 +281,7 @@ sub write_userdata {
     my %args = validate( @_, { path => 1, content => 1 } );
 
     $self->_write_file(
-        path    => File::Spec->catfile( $self->userdata_dir, $args{path} ),
+        path    => Prophet::Util->catfile( $self->userdata_dir, $args{path} ),
         content => $args{content},
     );
 }
@@ -290,7 +292,7 @@ sub store_local_metadata {
     my $key = shift;
     my $value = shift;
     $self->_write_file(
-        path    =>File::Spec->catfile( $self->local_metadata_dir,  lc($key)),
+        path    =>Prophet::Util->catfile( $self->local_metadata_dir,  lc($key)),
         content => $value,
     );
 
@@ -305,12 +307,13 @@ sub fetch_local_metadata {
 	# If there's a new-style all-lowercase file,  read that first. If there isn't,
 	# try to read an old-style sensitive file
 
-	my $insensitive_file = File::Spec->catfile($self->local_metadata_dir, lc($key));
-	my $sensitive_file = File::Spec->catfile($self->local_metadata_dir, $key);
+	my $insensitive_file = Prophet::Util->catfile($self->local_metadata_dir, lc($key));
+	my $sensitive_file = Prophet::Util->catfile($self->local_metadata_dir, $key);
 
 	return	$self->_read_file($insensitive_file) || $self->_read_file($sensitive_file);
 
 }
 
+no Any::Moose;
 
 1;

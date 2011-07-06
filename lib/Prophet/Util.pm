@@ -4,19 +4,33 @@ use File::Basename;
 use File::Spec;
 use File::Path;
 use Params::Validate;
+use Cwd;
 
-=head2 updir PATH
+=head2 updir PATH, DEPTH
 
 Strips off the filename in the given path and returns the absolute
 path of the remaining directory.
 
+Default depth is 1.
+If depth are great than 1, will go up more according to the depth value.
+
 =cut
 
 sub updir {
-    my $self = shift;
-    my $path = shift;
+    my $self  = shift;
+    my ( $path, $depth ) = validate_pos( @_, 1, { default => 1 } );
+    die "depth must be positive" unless $depth > 0;
+
     my ($file, $dir, undef) = fileparse(File::Spec->rel2abs($path));
-    return $dir;
+
+    $depth-- if $file; # we stripped the file part
+
+    if ($depth) {
+        $dir = File::Spec->catdir( $dir, ( File::Spec->updir ) x $depth );
+    }
+
+    # if $dir doesn't exists in file system, abs_path will return empty
+    return Cwd::abs_path($dir) || $dir;
 }
 
 =head2 slurp FILENAME
@@ -83,7 +97,8 @@ sub escape_utf8 {
 
 sub write_file {
     my $self = shift;
-    my %args = validate( @_, { file => 1, content => 1 } );
+    my %args = (@_); #validate is too heavy to be called here
+    # my %args = validate( @_, { file => 1, content => 1 } );
 
     my ( undef, $parent, $filename ) = File::Spec->splitpath($args{file});
     unless ( -d $parent ) {
@@ -103,6 +118,16 @@ sub hashed_dir_name {
     my $hash = shift;
 
     return ( substr( $hash, 0, 1 ), substr( $hash, 1, 1 ), $hash );
+}
+
+sub catfile {
+    my $self = shift;
+   
+    # File::Spec::catfile is more correct, but
+    # eats over 10% of prophet app runtime, 
+    # which isn't acceptable. 
+    return join('/',@_);
+
 }
 
 1;

@@ -39,6 +39,7 @@ END_WARNING
     push @args, '--chmod=Da+rx,a+r';
 
     push @args, '--verbose' if $self->context->has_arg('verbose');
+    push @args, '--progress' if $self->context->has_arg('progress');
 
     # avoid edge cases when exporting replicas! still update files even
     # if they have the same size and time.
@@ -59,6 +60,8 @@ END_WARNING
         }
     }
     
+    push @args, '-e', $args{shell} if defined $args{shell};
+
     push @args, '--recursive', '--' , $args{from}, $args{to};
 
     my $ret = system($rsync, @args);
@@ -79,7 +82,7 @@ END_DIE_MSG
     }
 }
 
-no Any::Moose;
+no Any::Moose 'Role';
 
 1;
 
