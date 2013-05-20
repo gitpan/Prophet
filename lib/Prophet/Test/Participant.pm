@@ -1,4 +1,7 @@
 package Prophet::Test::Participant;
+{
+  $Prophet::Test::Participant::VERSION = '0.751';
+}
 use Any::Moose;
 use Prophet::Test;
 use Test::Exception;
@@ -17,14 +20,15 @@ has arena => (
 sub BUILD {
     my $self = shift;
     as_user( $self->name, sub { call_func( [qw(init)] ) } );
-    as_user( $self->name, sub { call_func_ok( [qw(search --type Bug --regex .)] ) } );
+    as_user( $self->name,
+        sub { call_func_ok( [qw(search --type Bug --regex .)] ) } );
 
 }
 
 use List::Util qw(shuffle);
 
-my @CHICKEN_DO
-    = qw(create_record create_record delete_record  update_record update_record update_record update_record update_record sync_from_peer sync_from_peer noop);
+my @CHICKEN_DO =
+  qw(create_record create_record delete_record  update_record update_record update_record update_record update_record sync_from_peer sync_from_peer noop);
 
 sub take_one_step {
     my $self   = shift;
@@ -53,7 +57,7 @@ sub _permute_props {
     }
 
     if ( int( rand(10) < 3 ) ) {
-        $props{int(rand(5))+1 } = chr(rand(5)+65);
+        $props{ int( rand(5) ) + 1 } = chr( rand(5) + 65 );
     }
 
     return %props;
@@ -69,7 +73,7 @@ sub delete_record {
     my $args = shift;
     $args->{record} ||= get_random_local_record();
 
-    return undef unless ( $args->{record} );
+    return unless ( $args->{record} );
     $self->record_action( 'delete_record', $args );
     call_func_ok( [ qw(delete --type Scratch --uuid), $args->{record} ] );
 
@@ -80,7 +84,8 @@ sub create_record {
     my $args = shift;
     @{ $args->{props} } = _random_props() unless $args->{props};
 
-    my ( $ret, $out, $err ) = call_func_ok( [ qw(create --type Scratch --), @{ $args->{props} } ] );
+    my ( $ret, $out, $err ) =
+      call_func_ok( [ qw(create --type Scratch --), @{ $args->{props} } ] );
 
     #    ok($ret, $self->name . " created a record");
     if ( $out =~ /Created\s+(.*?)\s+(\d+)\s+\((.*)\)/i ) {
@@ -94,9 +99,10 @@ sub update_record {
     my $args = shift;
 
     $args->{record} ||= get_random_local_record();
-    return undef unless ( $args->{'record'} );
+    return unless ( $args->{'record'} );
 
-    my ( $ok, $stdout, $stderr ) = call_func( [ qw(show --type Scratch --uuid), $args->{record} ] );
+    my ( $ok, $stdout, $stderr ) =
+      call_func( [ qw(show --type Scratch --uuid), $args->{record} ] );
 
     my %props = map { split( /: /, $_, 2 ) } split( /\n/, $stdout );
     delete $props{id};
@@ -104,8 +110,13 @@ sub update_record {
     %{ $args->{props} } = _permute_props(%props) unless $args->{props};
     %props = %{ $args->{props} };
 
-    call_func_ok( [ qw(update --type Scratch --uuid), $args->{record}, '--', map { '--' . $_ => $props{$_} } keys %props ],
-        $self->name . " updated a record" );
+    call_func_ok(
+        [
+            qw(update --type Scratch --uuid),
+            $args->{record}, '--', map { '--' . $_ => $props{$_} } keys %props
+        ],
+        $self->name . " updated a record"
+    );
 
     $self->record_action( 'update_record', $args );
 
@@ -115,12 +126,19 @@ sub sync_from_peer {
     my $self = shift;
     my $args = shift;
 
-    my $from = $args->{from} ||= ( shuffle( grep { $_->name ne $self->name } $self->arena->chickens ) )[0]->name;
+    my $from = $args->{from} ||=
+      ( shuffle( grep { $_->name ne $self->name } $self->arena->chickens ) )[0]
+      ->name;
 
     $self->record_action( 'sync_from_peer', $args );
 
     @_ = (
-        [ 'merge', '--prefer', 'to', '--from', repo_uri_for($from), '--to', repo_uri_for( $self->name ), '--force' ],
+        [
+            'merge',                     '--prefer',
+            'to',                        '--from',
+            repo_uri_for($from),         '--to',
+            repo_uri_for( $self->name ), '--force'
+        ],
         $self->name . " sync from " . $from . " ran ok!"
     );
     goto \&call_func_ok;
@@ -128,8 +146,11 @@ sub sync_from_peer {
 }
 
 sub get_random_local_record {
-    my ( $ok, $stdout, $stderr ) = call_func( [qw(search --type Scratch --regex .)] );
-    my $update_record = ( shuffle( map { $_ =~ /'uuid': '(\S*?)'/ } split( /\n/, $stdout ) ) )[0];
+    my ( $ok, $stdout, $stderr ) =
+      call_func( [qw(search --type Scratch --regex .)] );
+    my $update_record =
+      ( shuffle( map { $_ =~ /'uuid': '(\S*?)'/ } split( /\n/, $stdout ) ) )
+      [0];
     return $update_record;
 }
 
@@ -139,17 +160,25 @@ sub dump_state {
 
     my $state;
 
-    my $records  = Prophet::Collection->new( handle => $cli->handle, type => 'Scratch' );
-    my $merges = Prophet::Collection->new( handle => $cli->handle, type => $Prophet::Replica::MERGETICKET_METATYPE );
-    my $resolutions = Prophet::Collection->new( handle => $cli->app_handle->handle->resolution_db_handle, type => '_prophet_resolution' );
+    my $records =
+      Prophet::Collection->new( handle => $cli->handle, type => 'Scratch' );
+    my $merges = Prophet::Collection->new(
+        handle => $cli->handle,
+        type   => $Prophet::Replica::MERGETICKET_METATYPE
+    );
+    my $resolutions = Prophet::Collection->new(
+        handle => $cli->app_handle->handle->resolution_db_handle,
+        type   => '_prophet_resolution'
+    );
 
-    $records->matching( sub       {1} );
+    $records->matching( sub     {1} );
     $resolutions->matching( sub {1} );
     $merges->matching( sub      {1} );
 
-    %{ $state->{records} }       = map { $_->uuid => $_->get_props } $records->items;
-    %{ $state->{merges} }      = map { $_->uuid => $_->get_props } $merges->items;
-    %{ $state->{resolutions} } = map { $_->uuid => $_->get_props } $resolutions->items;
+    %{ $state->{records} } = map { $_->uuid => $_->get_props } $records->items;
+    %{ $state->{merges} }  = map { $_->uuid => $_->get_props } $merges->items;
+    %{ $state->{resolutions} } =
+      map { $_->uuid => $_->get_props } $resolutions->items;
 
     return $state;
 
@@ -169,7 +198,8 @@ sub call_func_ok {
     my @ret;
     lives_and {
         @ret = call_func(@args);
-        diag("As ".$ENV{'PROPHET_EMAIL'}. " ".join(' ',@{$args[0]}));
+        diag(
+            "As " . $ENV{'PROPHET_EMAIL'} . " " . join( ' ', @{ $args[0] } ) );
         ok( 1, join( " ", $ENV{'PROPHET_EMAIL'}, @{ $args[0] } ) );
     };
     return @ret;
@@ -179,7 +209,7 @@ sub call_func {
     Carp::cluck unless ref $_[0];
 
     my @args = @{ shift @_ };
-    my $cli = Prophet::CLI->new();
+    my $cli  = Prophet::CLI->new();
 
     my $str = '';
     open my $str_fh, '>', \$str;
@@ -187,9 +217,9 @@ sub call_func {
     my $old_fh = select($str_fh);
 
     my $ret;
-    if (my $p = SVN::Pool->can('new_default')) {
-        $p->('SVN::Pool');    
-    };
+    if ( my $p = SVN::Pool->can('new_default') ) {
+        $p->('SVN::Pool');
+    }
 
     $ret = $cli->run_one_command(@args);
     select($old_fh) if defined $old_fh;
@@ -201,3 +231,134 @@ __PACKAGE__->meta->make_immutable;
 no Any::Moose;
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+Prophet::Test::Participant
+
+=head1 VERSION
+
+version 0.751
+
+=head1 AUTHORS
+
+=over 4
+
+=item *
+
+Jesse Vincent <jesse@bestpractical.com>
+
+=item *
+
+Chia-Liang Kao <clkao@bestpractical.com>
+
+=item *
+
+Christine Spang <christine@spang.cc>
+
+=back
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is Copyright (c) 2009 by Best Practical Solutions.
+
+This is free software, licensed under:
+
+  The MIT (X11) License
+
+=head1 BUGS AND LIMITATIONS
+
+You can make new bug reports, and view existing ones, through the
+web interface at L<https://rt.cpan.org/Public/Dist/Display.html?Name=Prophet>.
+
+=head1 CONTRIBUTORS
+
+=over 4
+
+=item *
+
+Alex Vandiver <alexmv@bestpractical.com>
+
+=item *
+
+Casey West <casey@geeknest.com>
+
+=item *
+
+Cyril Brulebois <kibi@debian.org>
+
+=item *
+
+Florian Ragwitz <rafl@debian.org>
+
+=item *
+
+Ioan Rogers <ioanr@cpan.org>
+
+=item *
+
+Jonas Smedegaard <dr@jones.dk>
+
+=item *
+
+Kevin Falcone <falcone@bestpractical.com>
+
+=item *
+
+Lance Wicks <lw@judocoach.com>
+
+=item *
+
+Nelson Elhage <nelhage@mit.edu>
+
+=item *
+
+Pedro Melo <melo@simplicidade.org>
+
+=item *
+
+Rob Hoelz <rob@hoelz.ro>
+
+=item *
+
+Ruslan Zakirov <ruz@bestpractical.com>
+
+=item *
+
+Shawn M Moore <sartak@bestpractical.com>
+
+=item *
+
+Simon Wistow <simon@thegestalt.org>
+
+=item *
+
+Stephane Alnet <stephane@shimaore.net>
+
+=item *
+
+Unknown user <nobody@localhost>
+
+=item *
+
+Yanick Champoux <yanick@babyl.dyndns.org>
+
+=item *
+
+franck cuny <franck@lumberjaph.net>
+
+=item *
+
+robertkrimen <robertkrimen@gmail.com>
+
+=item *
+
+sunnavy <sunnavy@bestpractical.com>
+
+=back
+
+=cut

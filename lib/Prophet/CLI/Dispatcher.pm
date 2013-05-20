@@ -1,4 +1,7 @@
 package Prophet::CLI::Dispatcher;
+{
+  $Prophet::CLI::Dispatcher::VERSION = '0.751';
+}
 use Path::Dispatcher::Declarative -base;
 use Any::Moose;
 extends 'Path::Dispatcher::Declarative', any_moose('Object');
@@ -14,48 +17,52 @@ sub add_command_prefix { unshift @PREFIXES, @_ }
 
 on '' => sub {
     my $self = shift;
-    if ($self->context->has_arg('version')) { run_command("Version")->($self) }
-    elsif( $self->context->has_arg('help') ){ run_command("Help")->($self) }
-    else { next_rule }
+    if ( $self->context->has_arg('version') ) {
+        run_command("Version")->($self);
+    } elsif ( $self->context->has_arg('help') ) {
+        run_command("Help")->($self);
+    } else {
+        next_rule;
+    }
 };
 
 # publish foo@bar.com:www/baz => publish --to foo@bar.com:www/baz
 on qr{^(publish|push) (\S+)$} => sub {
     my $self = shift;
-    $self->context->set_arg(to => $2);
-    run($1, $self);
+    $self->context->set_arg( to => $2 );
+    run( $1, $self );
 };
 
 # clone http://fsck.com/~jesse/sd-bugs => clone --from http://fsck.com/~jesse/sd-bugs
 on qr{^(clone|pull) (\S+)$} => sub {
     my $self = shift;
-    $self->context->set_arg(from => $2);
-    run($1, $self);
+    $self->context->set_arg( from => $2 );
+    run( $1, $self );
 };
 
 # log range => log --range range
 on qr{log\s+([0-9LATEST.~]+)} => sub {
     my $self = shift;
-    $self->context->set_arg(range => $1);
-    run('log', $self);
+    $self->context->set_arg( range => $1 );
+    run( 'log', $self );
 };
 
 under settings => sub {
     my $self = shift;
     on edit => sub {
         my $self = shift;
-        $self->context->set_arg( 'edit' );
-        run('settings', $self);
+        $self->context->set_arg('edit');
+        run( 'settings', $self );
     };
     on show => sub {
         my $self = shift;
-        $self->context->set_arg( 'show' );
-        run('settings', $self);
+        $self->context->set_arg('show');
+        run( 'settings', $self );
     };
     on set => sub {
         my $self = shift;
-        $self->context->set_arg( 'set' );
-        run('settings', $self);
+        $self->context->set_arg('set');
+        run( 'settings', $self );
     };
 };
 
@@ -63,27 +70,28 @@ dispatcher->add_rule(
     Path::Dispatcher::Rule::Sequence->new(
         rules => [
             Path::Dispatcher::Rule::Regex->new(
-                regex => qr/^(update|edit|show|display|delete|del|rm|history)$/,
+                regex =>
+                  qr/^(update|edit|show|display|delete|del|rm|history)$/,
             ),
             Prophet::CLI::Dispatcher::Rule::RecordId->new,
         ],
         block => sub {
             my $match = shift;
-            my $self = shift;
+            my $self  = shift;
             $self->context->set_id_from_primary_commands;
-            run($match->pos(1), $self, @_);
+            run( $match->pos(1), $self, @_ );
         },
     )
 );
 
-on [ [ 'update', 'edit' ] ]      => run_command("Update");
-on [ [ 'show', 'display' ] ]     => run_command("Show");
+on [ [ 'update', 'edit' ] ]    => run_command("Update");
+on [ [ 'show',   'display' ] ] => run_command("Show");
 on [ [ 'delete', 'del', 'rm' ] ] => run_command("Delete");
-on history                       => run_command("History");
+on history => run_command("History");
 
-on [ ['create', 'new'] ]         => run_command("Create");
-on [ ['search', 'list', 'ls' ] ] => run_command("Search");
-on [ ['aliases', 'alias'] ]      => run_command('Aliases');
+on [ [ 'create', 'new' ] ] => run_command("Create");
+on [ [ 'search', 'list', 'ls' ] ] => run_command("Search");
+on [ [ 'aliases', 'alias' ] ] => run_command('Aliases');
 
 on version  => run_command("Version");
 on init     => run_command("Init");
@@ -102,9 +110,9 @@ on info     => run_command('Info');
 on push     => run_command('Push');
 
 on qr/^(alias(?:es)?|config)?\s+(.*)/ => sub {
-    my ( $self ) = @_;
-    my $cmd = $1;
-    my $arg = $2;
+    my ($self) = @_;
+    my $cmd    = $1;
+    my $arg    = $2;
 
     my $class = $cmd =~ /^alias/ ? 'Aliases' : 'Config';
 
@@ -117,7 +125,7 @@ on qr/^(alias(?:es)?|config)?\s+(.*)/ => sub {
             context => $self->context,
             cli     => $self->cli,
         );
-        $cmd_obj->parse_cli_arg($cmd, $arg);
+        $cmd_obj->parse_cli_arg( $cmd, $arg );
         return run( $cmd, $self, @_ );
     }
 
@@ -135,7 +143,7 @@ on qr/^_gencomp\s*(.*)/ => sub {
 sub run_command {
     my $name = shift;
     return sub {
-        my $self = shift;
+        my $self             = shift;
         my %constructor_args = (
             cli      => $self->cli,
             context  => $self->context,
@@ -145,9 +153,9 @@ sub run_command {
         );
 
         # undef causes type constraint violations
-        for my $key (keys %constructor_args) {
+        for my $key ( keys %constructor_args ) {
             delete $constructor_args{$key}
-                if !defined($constructor_args{$key});
+              if !defined( $constructor_args{$key} );
         }
 
         my @classes = $self->class_names($name);
@@ -162,9 +170,9 @@ sub run_command {
 }
 
 sub class_names {
-    my $self = shift;
+    my $self    = shift;
     my $command = shift;
-    return map { $_."::".$command } @PREFIXES;
+    return map { $_ . "::" . $command } @PREFIXES;
 
 }
 
@@ -173,3 +181,133 @@ no Any::Moose;
 
 1;
 
+__END__
+
+=pod
+
+=head1 NAME
+
+Prophet::CLI::Dispatcher
+
+=head1 VERSION
+
+version 0.751
+
+=head1 AUTHORS
+
+=over 4
+
+=item *
+
+Jesse Vincent <jesse@bestpractical.com>
+
+=item *
+
+Chia-Liang Kao <clkao@bestpractical.com>
+
+=item *
+
+Christine Spang <christine@spang.cc>
+
+=back
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is Copyright (c) 2009 by Best Practical Solutions.
+
+This is free software, licensed under:
+
+  The MIT (X11) License
+
+=head1 BUGS AND LIMITATIONS
+
+You can make new bug reports, and view existing ones, through the
+web interface at L<https://rt.cpan.org/Public/Dist/Display.html?Name=Prophet>.
+
+=head1 CONTRIBUTORS
+
+=over 4
+
+=item *
+
+Alex Vandiver <alexmv@bestpractical.com>
+
+=item *
+
+Casey West <casey@geeknest.com>
+
+=item *
+
+Cyril Brulebois <kibi@debian.org>
+
+=item *
+
+Florian Ragwitz <rafl@debian.org>
+
+=item *
+
+Ioan Rogers <ioanr@cpan.org>
+
+=item *
+
+Jonas Smedegaard <dr@jones.dk>
+
+=item *
+
+Kevin Falcone <falcone@bestpractical.com>
+
+=item *
+
+Lance Wicks <lw@judocoach.com>
+
+=item *
+
+Nelson Elhage <nelhage@mit.edu>
+
+=item *
+
+Pedro Melo <melo@simplicidade.org>
+
+=item *
+
+Rob Hoelz <rob@hoelz.ro>
+
+=item *
+
+Ruslan Zakirov <ruz@bestpractical.com>
+
+=item *
+
+Shawn M Moore <sartak@bestpractical.com>
+
+=item *
+
+Simon Wistow <simon@thegestalt.org>
+
+=item *
+
+Stephane Alnet <stephane@shimaore.net>
+
+=item *
+
+Unknown user <nobody@localhost>
+
+=item *
+
+Yanick Champoux <yanick@babyl.dyndns.org>
+
+=item *
+
+franck cuny <franck@lumberjaph.net>
+
+=item *
+
+robertkrimen <robertkrimen@gmail.com>
+
+=item *
+
+sunnavy <sunnavy@bestpractical.com>
+
+=back
+
+=cut

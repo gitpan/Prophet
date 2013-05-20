@@ -14,7 +14,9 @@ use Test::More;
 use File::Find;
 eval 'use Module::CoreList';
 if ($@) { plan skip_all => 'Module::CoreList not installed' }
-if (! -d 'inc/.author') { plan skip_all => 'These tests only run for module authors'}
+if ( !-d 'inc/.author' ) {
+    plan skip_all => 'These tests only run for module authors';
+}
 
 plan 'no_plan';
 
@@ -38,7 +40,8 @@ sub wanted {
     $data =~ s/^=head.+?(^=cut|\Z)//gms;
 
     # look for use and use base statements
-    $used{$1}{$File::Find::name}++ while $data =~ /^\s*(?:use|require)\s+([\w:]+)/gm;
+    $used{$1}{$File::Find::name}++
+      while $data =~ /^\s*(?:use|require)\s+([\w:]+)/gm;
     while ( $data =~ m|^\s*use base qw.([\w\s:]+)|gm ) {
         $used{$_}{$File::Find::name}++ for split ' ', $1;
     }
@@ -50,7 +53,10 @@ my %required;
     ok( open( MAKEFILE, "Makefile.PL" ), "Opened Makefile" );
     my $data = <MAKEFILE>;
     close(FILE);
-    while ( $data =~ /^\s*?(?:requires|recommends|).*?([\w:]+)'(?:\s*=>\s*['"]?([\d\.]+)['"]?)?.*?(?:#(.*))?$/gm ) {
+    while ( $data =~
+        /^\s*?(?:requires|recommends|).*?([\w:]+)'(?:\s*=>\s*['"]?([\d\.]+)['"]?)?.*?(?:#(.*))?$/gm
+      )
+    {
         $required{$1} = $2;
         if ( defined $3 and length $3 ) {
             $required{$_} = undef for split ' ', $3;
@@ -65,7 +71,7 @@ for ( sort keys %used ) {
 
     #warn $_;
     ok( exists $required{$_}, "$_ in Makefile.PL" )
-        or diag( "used in ", join ", ", sort keys %{ $used{$_} } );
+      or diag( "used in ", join ", ", sort keys %{ $used{$_} } );
     delete $used{$_};
     delete $required{$_};
 }
@@ -73,7 +79,7 @@ for ( sort keys %used ) {
 for ( sort keys %required ) {
     my $first_in = Module::CoreList->first_release( $_, $required{$_} );
     fail("Required module $_ (v. $required{$_}) is in core since $first_in")
-        if defined $first_in and $first_in <= 5.008003;
+      if defined $first_in and $first_in <= 5.008003;
 }
 
 1;
